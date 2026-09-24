@@ -620,6 +620,9 @@ def main() -> int:
         try:
             text, tool = fetch_page(src["url"])
             row["tool"] = tool
+            if tool != "HTTP" and len(text) < 3000:
+                # a fallback returned only a page stub; do not report it as "0 new reviews"
+                raise RuntimeError(f"{tool}: incomplete page ({len(text)} chars)")
             items = extract_reviews(text, company["name"], company["aliases"], src["name"])
             bad = [i for i in items if "_error" in i]
             items = [i for i in items if "_error" not in i and i.get("text")]

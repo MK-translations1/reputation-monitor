@@ -67,7 +67,7 @@ GitHub Actions (вт и пт, 09:00 Киев)
 |---|---|---|
 | DOU | jobs.dou.ua/companies/mktranslations/reviews/ | HTTP |
 | Vnutri | vnutri.org/mktranslations/ | HTTP |
-| 44.ua | 44.ua/…/buro-perevodov-mktranslations/comments | HTTP |
+| 44.ua | 44.ua/…/buro-perevodov-mktranslations/comments | **не обязательный.** Сайт блокирует облачные серверы (GitHub, Exa, Jina). С домашнего или офисного IP открывается. Отзывы там клиентские |
 | NeoRabote (Мистер Кронос) | neorabote.net/feedback/list/company/118157 | HTTP |
 | NahJob (Мистер Кронос) | nahjob.club/компания/мистер-кронос | HTTP |
 | Vnutri (Мистер Кронос) | vnutri.org/ua/mister-kronos/ | HTTP |

@@ -40,7 +40,8 @@
           "name": "44.ua",
           "source_type": "44.ua",
           "code": "44UA",
-          "url": "https://www.44.ua/ru/catalog/index/584454/buro-perevodov-mktranslations/comments"
+          "url": "https://www.44.ua/ru/catalog/index/584454/buro-perevodov-mktranslations/comments",
+          "optional": true
         },
         {
           "name": "NeoRabote (Мистер Кронос)",
