@@ -1,0 +1,44 @@
+name: Reputation monitor
+
+on:
+  schedule:
+    # Tue and Fri 06:00 UTC = 09:00 Kyiv in summer (EEST), 08:00 in winter (EET)
+    - cron: "0 6 * * 2,5"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: no Notion writes, no email"
+        type: boolean
+        default: true
+
+concurrency:
+  group: reputation-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Run monitor
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ALERT_RECIPIENT: ${{ secrets.ALERT_RECIPIENT }}
+          ALERT_FROM: ${{ secrets.ALERT_FROM }}
+          DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '0' }}
+        run: python monitor.py

@@ -1,0 +1,82 @@
+{
+  "timezone": "Europe/Kyiv",
+  "overlap_days": 14,
+  "first_run_alert_max_age_days": 30,
+  "models": {
+    "jev": "typesafe/jev-1.13",
+    "llm": "google/gemini-2.5-flash-lite"
+  },
+  "notion": {
+    "reviews_db": "a20681bb-48e3-4c43-89a4-298d4216ae1f",
+    "state_db": "decdedbe-dc43-485c-acbb-c93227c6fa62",
+    "runs_db": "8626dcac-6322-4166-96e4-f6e7ea3befe1"
+  },
+  "companies": [
+    {
+      "name": "MK Translations",
+      "aliases": [
+        "MK Translations",
+        "MK:translations",
+        "MKTranslations",
+        "Мистер Кронос",
+        "Mister Kronos",
+        "Mr. Kronos",
+        "ООО Мистер Кронос"
+      ],
+      "sources": [
+        {
+          "name": "DOU",
+          "source_type": "DOU",
+          "code": "DOU",
+          "url": "https://jobs.dou.ua/companies/mktranslations/reviews/"
+        },
+        {
+          "name": "Vnutri",
+          "source_type": "vnutri",
+          "code": "VNUTRI",
+          "url": "https://www.vnutri.org/mktranslations/"
+        },
+        {
+          "name": "44.ua",
+          "source_type": "44.ua",
+          "code": "44UA",
+          "url": "https://www.44.ua/ru/catalog/index/584454/buro-perevodov-mktranslations/comments"
+        },
+        {
+          "name": "NeoRabote (Мистер Кронос)",
+          "source_type": "NeoRabote",
+          "code": "NEORABOTE",
+          "url": "https://neorabote.net/feedback/list/company/118157/lang/ru"
+        },
+        {
+          "name": "NahJob (Мистер Кронос)",
+          "source_type": "NahJob",
+          "code": "NAHJOB",
+          "url": "https://nahjob.club/%D0%BA%D0%BE%D0%BC%D0%BF%D0%B0%D0%BD%D0%B8%D1%8F/%D0%BC%D0%B8%D1%81%D1%82%D0%B5%D1%80-%D0%BA%D1%80%D0%BE%D0%BD%D0%BE%D1%81"
+        },
+        {
+          "name": "Vnutri (Мистер Кронос)",
+          "source_type": "vnutri",
+          "code": "VNUTRI_KRONOS",
+          "url": "https://www.vnutri.org/ua/mister-kronos/"
+        },
+        {
+          "name": "TOP20 (Мистер Кронос)",
+          "source_type": "TOP20",
+          "code": "TOP20",
+          "url": "https://top20.ua/ru/kyiv/biznes-uslugi/tsentryi-perevodov/mister-kronos-tsentr-perevodov.html"
+        }
+      ]
+    }
+  ],
+  "shared_sources": [
+    {
+      "name": "Layboard blacklist",
+      "source_type": "Інше",
+      "code": "LAYBOARD",
+      "optional": true,
+      "url": "https://layboard.com/rabotodateli/chernyj-spisok-rabotodatelej-ukraina"
+    }
+  ],
+  "disabled_sources_note": "LinkedIn (MK Translations, Localica.io) вимкнено: без Apify надійного безкоштовного збору без логіну немає."
+}

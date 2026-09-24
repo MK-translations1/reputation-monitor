@@ -1,0 +1,2 @@
+# Optional: browser-like TLS fingerprint for pages that return 403 to plain HTTP (TOP20).
+curl_cffi>=0.7
