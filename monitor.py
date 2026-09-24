@@ -221,9 +221,7 @@ def extract_reviews(page_text: str, company: str, aliases: list[str], source_nam
     found = []
     for it in items:
         start = (it.get("start") or "").strip()
-        pos = norm.find(start) if start else -1
-        if pos < 0 and start:
-            pos = norm.lower().find(start.lower()[:60])
+        pos = find_anchor(norm, start) if start else -1
         if pos < 0:
             it["_error"] = "start anchor not found"
             found.append(it)
@@ -234,13 +232,55 @@ def extract_reviews(page_text: str, company: str, aliases: list[str], source_nam
     for idx, it in enumerate(ok):
         nxt = ok[idx + 1]["_pos"] if idx + 1 < len(ok) else len(norm)
         end = (it.get("end") or "").strip()
-        epos = norm.find(end, it["_pos"]) if end else -1
-        if 0 <= epos < nxt + len(end):
-            stop = epos + len(end)
+        epos, elen = find_anchor(norm, end, it["_pos"], want_len=True) if end else (-1, 0)
+        if 0 <= epos < nxt:
+            stop = epos + elen
         else:
             stop = min(nxt, it["_pos"] + 6000)
         it["text"] = norm[it["_pos"]:stop].strip()
     return ok + [i for i in found if "_error" in i]
+
+
+_FOLD = str.maketrans({"«": '"', "»": '"', "“": '"', "”": '"', "„": '"', "’": "'", "‘": "'",
+                       "–": "-", "—": "-", "\u00a0": " ", "ё": "е", "Ё": "Е"})
+
+
+def _normalize(text: str) -> tuple[str, list[int]]:
+    """Lowercase, fold quotes/dashes, collapse whitespace; keep a map to original offsets."""
+    out, idx, prev_space = [], [], False
+    for i, ch in enumerate(text.translate(_FOLD)):
+        if ch.isspace():
+            if prev_space:
+                continue
+            ch, prev_space = " ", True
+        else:
+            prev_space = False
+        out.append(ch.lower())
+        idx.append(i)
+    return "".join(out), idx
+
+
+def find_anchor(text: str, anchor: str, start: int = 0, want_len: bool = False):
+    """Find a model-quoted snippet in the page, tolerating quote/space/case differences
+    and a slightly wrong tail (falls back to the first 6, then 4 words)."""
+    def result(pos, length):
+        return (pos, length) if want_len else pos
+    pos = text.find(anchor, start)
+    if pos >= 0:
+        return result(pos, len(anchor))
+    ntext, nmap = _normalize(text)
+    nstart = next((k for k, i in enumerate(nmap) if i >= start), len(nmap))
+    words = _normalize(anchor)[0].split()
+    for n in (len(words), 6, 4):
+        if n > len(words) or n == 0:
+            continue
+        needle = " ".join(words[:n]) if not want_len else " ".join(words[-n:])
+        k = ntext.find(needle, nstart)
+        if k >= 0:
+            o_start = nmap[k]
+            o_end = nmap[min(k + len(needle) - 1, len(nmap) - 1)] + 1
+            return result(o_start, o_end - o_start)
+    return result(-1, 0)
 
 
 SUMMARY_SYSTEM = """You write short HR alert notes in Ukrainian about one employer review.
@@ -578,7 +618,8 @@ def main() -> int:
                     errors.append(f"{key}: {warn}")
                 alert = needs_alert(vals)
                 alert_status = "Очікує" if alert else "Не потрібно"
-                if alert and first_run and pub and (NOW.date() - pub).days > CFG["first_run_alert_max_age_days"]:
+                if alert and first_run and (pub is None or
+                                            (NOW.date() - pub).days > CFG["first_run_alert_max_age_days"]):
                     alert_status = "Історичний"
                 notes = None
                 if alert:
@@ -621,7 +662,11 @@ def main() -> int:
     run_status = "COMPLETED" if not required_failed else ("PARTIALLY_COMPLETED" if ok_rows else "FAILED")
     tech = technical_problems(report, state, run_status)
 
-    if (pending_pages or tech) and not DRY_RUN:
+    email_configured = bool(CFG["alert_recipient"] and (env("RESEND_API_KEY", required=False)
+                                                         or env("SMTP_HOST", required=False)))
+    if (pending_pages or tech) and not DRY_RUN and not email_configured:
+        errors.append(f"Email не налаштовано: {len(pending_pages)} алерт(ів) лишаються «Очікує» в Notion")
+    elif (pending_pages or tech) and not DRY_RUN:
         subject, body = build_email(pending_pages, tech)
         try:
             send_email(subject, body)
