@@ -11,7 +11,7 @@ on:
         type: boolean
         default: true
       test_email:
-        description: "Send a test email to ALERT_RECIPIENT before the run"
+        description: "Send a test Teams message / email before the run"
         type: boolean
         default: false
       backfill:
@@ -46,6 +46,7 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
           ALERT_RECIPIENT: ${{ secrets.ALERT_RECIPIENT }}
           ALERT_FROM: ${{ secrets.ALERT_FROM }}
           BACKFILL: ${{ (github.event_name == 'workflow_dispatch' && inputs.backfill) && '1' || '0' }}

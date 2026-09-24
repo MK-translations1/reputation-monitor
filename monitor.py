@@ -10,6 +10,7 @@ Env:
   EXA_API_KEY         optional, fallback fetch for pages that block bots
   RESEND_API_KEY      optional, email via Resend
   SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD  optional, email via SMTP
+  TEAMS_WEBHOOK_URL   optional, Teams Workflows webhook for HR alerts
   ALERT_RECIPIENT     email address that receives HR alerts
   ALERT_FROM          optional sender, e.g. "Reputation Monitor <monitoring@example.com>"
   DRY_RUN=1           fetch + classify only; no Notion writes, no email
@@ -544,6 +545,43 @@ def send_email(subject: str, html_body: str) -> None:
     raise RuntimeError("email not configured (no RESEND_API_KEY / SMTP_HOST)")
 
 
+def send_teams(pages: list[dict], tech: list[str], test: bool = False) -> None:
+    """Post an Adaptive Card to a Teams channel/chat via a Workflows webhook
+    ("When a Teams webhook request is received" -> "Post card in a chat or channel")."""
+    url = env("TEAMS_WEBHOOK_URL")
+    body: list[dict] = []
+    if test:
+        body.append({"type": "TextBlock", "wrap": True, "text": "Тестове повідомлення: сповіщення моніторингу репутації працюють."})
+    if pages:
+        body.append({"type": "TextBlock", "size": "Large", "weight": "Bolder", "wrap": True,
+                     "text": f"HR Alert: {len(pages)} відгук(и) потребують реакції HR"})
+    prio_order = {"Критичний": 0, "Високий": 1, "Середній": 2, "Низький": 3}
+    for p in sorted(pages, key=lambda x: prio_order.get(prop_text(x, "Пріоритет"), 9)):
+        notes = prop_text(p, "Ключові проблеми")
+        body += [
+            {"type": "TextBlock", "weight": "Bolder", "wrap": True, "separator": True, "spacing": "Medium",
+             "text": f"{prop_text(p, 'Компанія')} — {prop_text(p, 'Джерело')}"},
+            {"type": "FactSet", "facts": [
+                {"title": "Дата", "value": prop_text(p, "Дата публікації") or "невідома"},
+                {"title": "Аудиторія", "value": prop_text(p, "Аудиторія")},
+                {"title": "Тональність", "value": prop_text(p, "Тональність")},
+                {"title": "Пріоритет", "value": prop_text(p, "Пріоритет")},
+                {"title": "Зона ризику", "value": prop_text(p, "Зона ризику")}]},
+            {"type": "TextBlock", "wrap": True, "text": notes.replace("\n", "\n\n")},
+            {"type": "ActionSet", "actions": [
+                {"type": "Action.OpenUrl", "title": "Запис у Notion", "url": p.get("url")},
+                {"type": "Action.OpenUrl", "title": "Оригінал відгуку", "url": prop_text(p, "Посилання")}]},
+        ]
+    if tech:
+        body.append({"type": "TextBlock", "weight": "Bolder", "separator": True, "text": "Технічні проблеми"})
+        body += [{"type": "TextBlock", "wrap": True, "text": f"• {t}"} for t in tech]
+    card = {"type": "message", "attachments": [{
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "content": {"$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                    "type": "AdaptiveCard", "version": "1.4", "msteams": {"width": "Full"}, "body": body}}]}
+    http_json("POST", url, {}, card, retries=2)
+
+
 # ---------------------------------------------------------------- main pipeline
 
 def make_id(it: dict, code: str, run_seen: set) -> str:
@@ -574,7 +612,13 @@ def main() -> int:
     run_start = NOW.isoformat(timespec="seconds")
     log(f"Run {run_start} {'(DRY RUN)' if DRY_RUN else ''}")
 
-    if os.environ.get("TEST_EMAIL") == "1" and not DRY_RUN:
+    if os.environ.get("TEST_EMAIL") == "1" and not DRY_RUN and env("TEAMS_WEBHOOK_URL", required=False):
+        try:
+            send_teams([], [], test=True)
+            log("Test Teams message: sent")
+        except Exception as e:
+            log(f"Test Teams message: FAILED {e}")
+    if os.environ.get("TEST_EMAIL") == "1" and not DRY_RUN and CFG["alert_recipient"]:
         try:
             send_email("[Monitoring] Тестовий лист моніторингу репутації",
                        "<p>Це тестовий лист. Якщо ви його отримали — відправка алертів HR працює.</p>"
@@ -699,21 +743,34 @@ def main() -> int:
 
     email_configured = bool(CFG["alert_recipient"] and (env("RESEND_API_KEY", required=False)
                                                          or env("SMTP_HOST", required=False)))
-    if (pending_pages or tech) and not DRY_RUN and not email_configured:
-        errors.append(f"Email не налаштовано: {len(pending_pages)} алерт(ів) лишаються «Очікує» в Notion")
+    teams_configured = bool(env("TEAMS_WEBHOOK_URL", required=False))
+    if (pending_pages or tech) and not DRY_RUN and not (email_configured or teams_configured):
+        errors.append(f"Сповіщення не налаштовано: {len(pending_pages)} алерт(ів) лишаються «Очікує» в Notion")
     elif (pending_pages or tech) and not DRY_RUN:
-        subject, body = build_email(pending_pages, tech)
-        try:
-            send_email(subject, body)
+        delivered, channel_errors = [], []
+        if teams_configured:
+            try:
+                send_teams(pending_pages, tech)
+                delivered.append("Teams")
+            except Exception as e:
+                channel_errors.append(f"Teams: {e}")
+        if email_configured:
+            subject, body = build_email(pending_pages, tech)
+            try:
+                send_email(subject, body)
+                delivered.append("Email")
+            except Exception as e:
+                channel_errors.append(f"Email: {e}")
+        errors += channel_errors
+        alert_error = "; ".join(channel_errors)
+        status = "Надіслано" if delivered else "Помилка"
+        if delivered:
             alerts_sent = len(pending_pages)
-            for p in pending_pages:
-                notion("PATCH", f"pages/{p['id']}", {"properties": {
-                    "Статус алерту": sel("Надіслано"), "Алерт надіслано": date(run_start)}})
-        except Exception as e:
-            alert_error = str(e)
-            errors.append(f"Email: {e}")
-            for p in pending_pages:
-                notion("PATCH", f"pages/{p['id']}", {"properties": {"Статус алерту": sel("Помилка")}})
+        for p in pending_pages:
+            props = {"Статус алерту": sel(status)}
+            if delivered:
+                props["Алерт надіслано"] = date(run_start)
+            notion("PATCH", f"pages/{p['id']}", {"properties": props})
     elif DRY_RUN and pending:
         subject, body = build_email_preview(pending)
         log(f"[DRY RUN] would send email: {subject}")
