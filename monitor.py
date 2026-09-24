@@ -183,6 +183,14 @@ def fetch_page(url: str) -> tuple[str, str]:
 # ---------------------------------------------------------------- LLM (OpenRouter)
 
 def llm_json(system: str, user: str, max_tokens: int = 8000) -> dict:
+    """One retry on malformed/truncated JSON."""
+    try:
+        return _llm_json_once(system, user, max_tokens)
+    except json.JSONDecodeError:
+        return _llm_json_once(system, user, max_tokens * 2)
+
+
+def _llm_json_once(system: str, user: str, max_tokens: int) -> dict:
     res = http_json("POST", "https://openrouter.ai/api/v1/chat/completions",
                     {"Authorization": f"Bearer {env('OPENROUTER_API_KEY')}"},
                     {"model": CFG["models"]["llm"], "temperature": 0, "max_tokens": max_tokens,
