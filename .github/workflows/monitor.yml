@@ -10,6 +10,10 @@ on:
         description: "Dry run: no Notion writes, no email"
         type: boolean
         default: true
+      backfill:
+        description: "One-off: fill «Ключові проблеми» for existing records (no collection)"
+        type: boolean
+        default: false
 
 concurrency:
   group: reputation-monitor
@@ -40,5 +44,6 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           ALERT_RECIPIENT: ${{ secrets.ALERT_RECIPIENT }}
           ALERT_FROM: ${{ secrets.ALERT_FROM }}
+          BACKFILL: ${{ (github.event_name == 'workflow_dispatch' && inputs.backfill) && '1' || '0' }}
           DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '0' }}
         run: python monitor.py
