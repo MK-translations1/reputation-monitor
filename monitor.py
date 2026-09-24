@@ -164,13 +164,24 @@ def fetch_page(url: str) -> tuple[str, str]:
         errors.append("curl_cffi: not installed")
     except Exception as e:
         errors.append(f"curl_cffi: {e}")
-    # 3. Exa contents API for the same exact URL (no search)
+    # 3. Jina Reader (free, no key): fetches the same URL from its own infrastructure
+    try:
+        req = urllib.request.Request("https://r.jina.ai/" + url,
+                                     headers={"User-Agent": UA, "X-Return-Format": "text"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            txt = r.read().decode("utf-8", "replace")
+        if len(txt) > 1500 and not _looks_blocked(200, txt) and "403" not in txt[:300]:
+            return txt, "Jina Reader"
+        errors.append(f"Jina: short/blocked ({len(txt)} chars)")
+    except Exception as e:
+        errors.append(f"Jina: {e}")
+    # 4. Exa contents API for the same exact URL (no search)
     exa = env("EXA_API_KEY", required=False)
     if exa:
         try:
             res = http_json("POST", "https://api.exa.ai/contents", {"x-api-key": exa},
                             {"urls": [url], "text": {"maxCharacters": MAX_PAGE_CHARS},
-                             "livecrawl": "always", "livecrawlTimeout": 30000}, timeout=90, retries=2)
+                             "livecrawl": "preferred", "livecrawlTimeout": 30000}, timeout=90, retries=2)
             items = res.get("results") or []
             if items and items[0].get("text"):
                 log(f"  Exa: {len(items[0]['text'])} chars")
