@@ -10,6 +10,10 @@ on:
         description: "Dry run: no Notion writes, no email"
         type: boolean
         default: true
+      test_email:
+        description: "Send a test email to ALERT_RECIPIENT before the run"
+        type: boolean
+        default: false
       backfill:
         description: "One-off: fill «Ключові проблеми» for existing records (no collection)"
         type: boolean
@@ -45,5 +49,6 @@ jobs:
           ALERT_RECIPIENT: ${{ secrets.ALERT_RECIPIENT }}
           ALERT_FROM: ${{ secrets.ALERT_FROM }}
           BACKFILL: ${{ (github.event_name == 'workflow_dispatch' && inputs.backfill) && '1' || '0' }}
+          TEST_EMAIL: ${{ (github.event_name == 'workflow_dispatch' && inputs.test_email) && '1' || '0' }}
           DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '0' }}
         run: python monitor.py

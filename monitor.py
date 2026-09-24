@@ -560,6 +560,15 @@ def main() -> int:
     run_start = NOW.isoformat(timespec="seconds")
     log(f"Run {run_start} {'(DRY RUN)' if DRY_RUN else ''}")
 
+    if os.environ.get("TEST_EMAIL") == "1" and not DRY_RUN:
+        try:
+            send_email("[Monitoring] Тестовий лист моніторингу репутації",
+                       "<p>Це тестовий лист. Якщо ви його отримали — відправка алертів HR працює.</p>"
+                       f"<p style='color:#888'>{NOW.strftime('%Y-%m-%d %H:%M')}</p>")
+            log("Test email: sent")
+        except Exception as e:
+            log(f"Test email: FAILED {e}")
+
     # --- load state + existing IDs
     state, existing_ids, existing_urls = {}, set(), set()
     if env("NOTION_TOKEN", required=False):
