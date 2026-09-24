@@ -68,7 +68,8 @@ def http_json(method: str, url: str, headers: dict, body=None, timeout=90, retri
     data = json.dumps(body).encode() if body is not None else None
     for attempt in range(retries):
         req = urllib.request.Request(url, data=data, method=method,
-                                     headers={"Content-Type": "application/json", **headers})
+                                     headers={"Content-Type": "application/json",
+                                              "User-Agent": "reputation-monitor/1.0", **headers})
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.loads(r.read().decode("utf-8") or "{}")
@@ -168,9 +169,11 @@ def fetch_page(url: str) -> tuple[str, str]:
     if exa:
         try:
             res = http_json("POST", "https://api.exa.ai/contents", {"x-api-key": exa},
-                            {"urls": [url], "text": True}, timeout=60, retries=2)
+                            {"urls": [url], "text": {"maxCharacters": MAX_PAGE_CHARS},
+                             "livecrawl": "always", "livecrawlTimeout": 30000}, timeout=90, retries=2)
             items = res.get("results") or []
             if items and items[0].get("text"):
+                log(f"  Exa: {len(items[0]['text'])} chars")
                 return items[0]["text"], "Exa (fallback)"
             errors.append("Exa: empty result")
         except Exception as e:
