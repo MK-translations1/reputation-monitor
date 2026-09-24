@@ -143,15 +143,48 @@ DRY_RUN=1 python3 monitor.py
 
 Если ни Teams, ни почта не настроены, алерты остаются в Notion со статусом «Очікує» и уходят при первом запуске с настроенной почтой.
 
-### 6.1. Как подключить Teams
+### 6.1. Teams: как устроено и как сменить получателя
 
-1. В Teams откройте канал (например, HR) или чат, куда должны приходить алерты.
-2. **•••** у названия канала → **Workflows** → шаблон **«Send webhook alerts to a channel»** (или **«Post to a channel when a webhook request is received»**; для чата — **«Send webhook alerts to a chat»**).
-3. Назовите workflow `Reputation Monitor`, выберите команду и канал (или чат) → **Add workflow**.
-4. Скопируйте показанный **URL** и сохраните его в секрет `TEAMS_WEBHOOK_URL`.
-5. Проверка: **Run workflow** с флажком *test_email* → в канал придёт тестовое сообщение.
+**Текущая настройка (работает с 2026-09-24):**
 
-Workflow работает от имени того, кто его создал. Если этот человек уйдёт из компании, workflow нужно пересоздать.
+| Что | Значение |
+|---|---|
+| Workflow | **Reputation Monitor** в Power Automate, среда *Default* |
+| Открыть | [make.powerautomate.com → Reputation Monitor](https://make.powerautomate.com/environments/Default-c19d5ad8-bf98-4110-9cd3-32a40d380faf/flows/ef79f8e1-6807-4845-b567-72b907a9b15e) |
+| Как приходит | личный чат с **Workflows (Flow bot)** в Teams |
+| Кому | задано в самом workflow, в поле *Recipient* (в репозитории адреса нет) |
+| Адрес webhook | секрет `TEAMS_WEBHOOK_URL` |
+
+Скрипт только отправляет карточку на webhook. **Кому она придёт, решает workflow**, поэтому получателя меняют в Power Automate, а код и GitHub трогать не нужно. URL webhook при этом не меняется.
+
+#### Сменить получателя (другой человек в личном чате)
+
+1. Откройте workflow по ссылке выше → **Edit**.
+2. Внутри блока **Condition** («Attachments is null») есть **два** одинаковых шага **«Post card in a chat or channel»**: один в ветке *True*, второй в ветке *False* внутри *For each*. **Поменять нужно в обоих.**
+3. В каждом шаге:
+   - **Post as:** Flow bot
+   - **Post in:** Chat with Flow bot
+   - **Recipient:** рабочий e-mail нового получателя. Можно указать несколько через `;`
+4. **Save**.
+5. Проверка: GitHub → **Actions → Reputation monitor → Run workflow**, снимите *Dry run* и поставьте *test_email* → получателю придёт тестовое сообщение.
+
+#### Отправлять в канал команды (например, HR)
+
+В тех же двух шагах поставьте **Post in: Channel**, выберите **Team** и **Channel** → **Save**.
+
+#### Отправлять в групповой чат
+
+**Post in: Group chat** → выберите чат из списка. **Не выбирайте чат «Заметки» / «(вы)»**: Teams не даёт ботам туда писать, и workflow падает с ошибкой `Call made for a thread which is not a ChatThread`.
+
+#### Если сообщения перестали приходить
+
+- Откройте workflow → **28-day run history**. Красный запуск покажет ошибку.
+- Workflow работает от имени того, кто его создал. Если у этого человека сменился пароль или он ушёл из компании, обновите подключение Teams (**Edit → Connections**) или создайте workflow заново. Если workflow пересоздан, новый URL нужно сохранить в секрет `TEAMS_WEBHOOK_URL`.
+- Если URL webhook куда-то утёк, пересоздайте workflow: старый адрес перестанет работать.
+
+#### Создать заново с нуля
+
+Teams → **Apps → Workflows** → шаблон **«Send webhook alerts to a chat»** (или *…to a channel*) → имя `Reputation Monitor` → **Add workflow** → скопируйте URL в `TEAMS_WEBHOOK_URL` → настройте получателя по шагам выше.
 
 **Ротация ключа:** создайте новый ключ в сервисе, обновите секрет (`gh secret set NAME -R MK-translations1/reputation-monitor`) и удалите старый ключ.
 
@@ -196,5 +229,6 @@ Workflow работает от имени того, кто его создал. 
 | 2026-09-24 | Первая версия: 7 источников + Layboard, Jev + gemini-2.5-flash-lite, Notion, письма через Resend/SMTP |
 | 2026-09-24 | «Ключові проблеми» заполняется для всех отзывов, добавлен режим backfill |
 | 2026-09-24 | Уведомления в Teams через Workflows webhook (`TEAMS_WEBHOOK_URL`), почта стала необязательной |
+| 2026-09-24 | Workflow «Reputation Monitor» переключён с чата «Заметки» на «Chat with Flow bot» (ошибка «not a ChatThread»); тест доставки прошёл |
 | 2026-09-24 | 44.ua — необязательный источник; заглушка страницы от запасного способа считается сбоем |
 | 2026-09-24 | Репозиторий **временно публичный**, потому что закончились бесплатные минуты Actions для приватных репозиториев. Адрес получателя перенесён в секрет `ALERT_RECIPIENT`. **После 1 октября 2026 снова сделать приватным:** Settings → General → Danger Zone → Change visibility |
